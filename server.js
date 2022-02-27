@@ -315,7 +315,7 @@ app.get('/startSession', (req, res) => {
         method: "POST"
       })
         .then( () => {
-          db.run('UPDATE users SET session = ?, alert_id = ?, latest_score = ?, WHERE email = ?', [1, 0, null, req.user], (err) => {
+          db.run('UPDATE users SET session = ?, alert_id = ?, latest_score = ? WHERE email = ?', [1, 0, null, req.user], (err) => {
             if(err){
               res.json({success: false});
             } else {
@@ -384,7 +384,7 @@ app.get('/getAlerts', (req, res) => {
       .then( (response) => {
         response.json()
         .then((data) => {
-          feeling = data.feeling;
+          feeling = data;
           console.log("Predicted feeling: ",feeling);
           if((row.alert_id == 0 || feeling != row.latest_score)&&feeling<6&&feeling>0){
             db.run('UPDATE users SET alert_id = ?, latest_score = ? WHERE email = ?', [row.alert_id+1,feeling, req.user], (err) => {
@@ -400,7 +400,8 @@ app.get('/getAlerts', (req, res) => {
         }, () => {
           res.json({alert: false, message: null});
         });
-      }, () => {
+      }, (err) => {
+        console.log(err);
         res.json({alert: false, message: null});
       });
     }
@@ -417,16 +418,20 @@ app.get('/getLatestData', (req, res) => {
       .then( (response) => {
         response.json()
         .then((data) => {
-          obj = data[data.length-1];
-          temp = obj.temp;
-          humidity = obj.humidity;
-          intensity = obj.intensity;
-          colours = [obj.violet, obj.blue, obj.green, obj.yellow, obj.orange, obj.red];
-          max_colour = Math.max(obj.violet, obj.blue, obj.green, obj.yellow, obj.orange, obj.red);
-          for(let i = 0; i < 6; i++){
-            colours[i] = Math.round(colours[i]*100/max_colour);
+          if(data.length<1){
+            res.json({success: false, temperature: null, humidity: null, intensity: null, colours: null});
+          } else {
+            obj = data[data.length-1];
+            temp = obj.temp;
+            humidity = obj.humidity;
+            intensity = obj.intensity;
+            colours = [obj.violet, obj.blue, obj.green, obj.yellow, obj.orange, obj.red];
+            max_colour = Math.max(obj.violet, obj.blue, obj.green, obj.yellow, obj.orange, obj.red);
+            for(let i = 0; i < 6; i++){
+              colours[i] = Math.round(colours[i]*100/max_colour);
+            }
+            res.json({success: true, temperature: temp, humidity: humidity, intensity: intensity, colours: colours});
           }
-          res.json({success: true, temperature: temp, humidity: humidity, intensity: intensity, colours: colours});
         })
       }, () => {
         res.json({success: false, temperature: null, humidity: null, intensity: null, colours: null});
@@ -445,22 +450,26 @@ app.get('/tempHumidityData', (req, res) => {
       .then( (response) => {
         response.json()
         .then((data) => {
-          tempdata = [];
-          humiditydata = [];
-          mintemp = 100;
-          maxtemp = 0;
-          minhumidity = 100;
-          maxhumidity = 0;
-          for(let i = 0; i < data.length; i++){
-            mintemp = Math.min(mintemp, data[i].temp);
-            maxtemp = Math.max(maxtemp, data[i].temp);
-            minhumidity = Math.min(minhumidity, data[i].temp);
-            maxhumidity = Math.max(maxhumidity, data[i].temp);
-            timestamp = toTimestamp(data[i].timestamp);
-            tempdata.push({x: timestamp, y: data[i].temp});
-            humiditydata.push({x: timestamp, y: data[i].humidity});
+          if(data.length < 1){
+            res.json({success: false, temperature: null, humidity: null, mintemp: null, maxtemp: null, minhumidity: null, maxhumidity: null});
+          } else {
+            tempdata = [];
+            humiditydata = [];
+            mintemp = 100;
+            maxtemp = 0;
+            minhumidity = 100;
+            maxhumidity = 0;
+            for(let i = 0; i < data.length; i++){
+              mintemp = Math.min(mintemp, data[i].temp);
+              maxtemp = Math.max(maxtemp, data[i].temp);
+              minhumidity = Math.min(minhumidity, data[i].humidity);
+              maxhumidity = Math.max(maxhumidity, data[i].humidity);
+              timestamp = toTimestamp(data[i].time_stamp);
+              tempdata.push({x: timestamp, y: data[i].temp});
+              humiditydata.push({x: timestamp, y: data[i].humidity});
+            }
+            res.json({success: true, temperature: tempdata, humidity: humiditydata, mintemp: Math.floor(mintemp-1), maxtemp: Math.ceil(maxtemp+1), minhumidity: Math.floor(minhumidity-2), maxhumidity: Math.ceil(maxhumidity+2)});
           }
-          res.json({success: true, temperature: tempdata, humidity: humiditydata, mintemp: Math.floor(mintemp-1), maxtemp: Math.ceil(maxtemp+1), minhumidity: Math.floor(minhumidity-2), maxhumidity: Math.ceil(maxhumidity+2)});
         })
       }, () => {
         res.json({success: false, temperature: null, humidity: null, mintemp: null, maxtemp: null, minhumidity: null, maxhumidity: null});
@@ -479,28 +488,35 @@ app.get('/sessionData', (req, res) => {
       .then( (response) => {
         response.json()
         .then((data) => {
-          tempdata = [];
-          humiditydata = [];
-          scoredata = [];
-          mintemp = 100;
-          maxtemp = 0;
-          minhumidity = 100;
-          maxhumidity = 0;
-          minscore = 10;
-          maxscore = 0;
-          for(let i = 0; i < data.length; i++){
-            mintemp = Math.min(mintemp, data[i].temp);
-            maxtemp = Math.max(maxtemp, data[i].temp);
-            minhumidity = Math.min(minhumidity, data[i].temp);
-            maxhumidity = Math.max(maxhumidity, data[i].temp);
-            minscore = Math.min(minscore, data[i].feeling);
-            maxscore = Math.max(maxscore, data[i].feeling);
-            timestamp = toTimestamp(data[i].start_time);
-            tempdata.push({x: timestamp, y: data[i].temp});
-            humiditydata.push({x: timestamp, y: data[i].humidity});
-            scoredata.push({x: timestamp, y:data[i].feeling});
+          if(data.length < 1){
+            res.json({success: false, temperature: null, humidity: null, score: null, mintemp: null, maxtemp: null, minhumidity: null, maxhumidity: null, minscore: null, maxscore: null});
+          } else {
+            tempdata = [];
+            humiditydata = [];
+            scoredata = [];
+            mintemp = 100;
+            maxtemp = 0;
+            minhumidity = 100;
+            maxhumidity = 0;
+            minscore = 10;
+            maxscore = 0;
+            for(let i = 0; i < data.length-1; i++){
+              mintemp = Math.min(mintemp, data[i].avg_temp);
+              maxtemp = Math.max(maxtemp, data[i].avg_temp);
+              minhumidity = Math.min(minhumidity, data[i].avg_humidity);
+              maxhumidity = Math.max(maxhumidity, data[i].avg_humidity);
+              minscore = Math.min(minscore, data[i].feeling);
+              maxscore = Math.max(maxscore, data[i].feeling);
+              timestamp = toTimestamp(data[i].start);
+              tempdata.push({x: timestamp, y: data[i].avg_temp});
+              humiditydata.push({x: timestamp, y: data[i].avg_humidity});
+              scoredata.push({x: timestamp, y:data[i].feeling});
+            }
+            console.log(tempdata);
+            console.log(humiditydata);
+            console.log(scoredata);
+            res.json({success: true, temperature: tempdata, humidity: humiditydata, score: scoredata, mintemp: Math.floor(mintemp-1), maxtemp: Math.ceil(maxtemp+1), minhumidity: Math.floor(minhumidity-2), maxhumidity: Math.ceil(maxhumidity+2), minscore: Math.max(minscore-1,0), maxscore: Math.min(maxscore+1,10)});
           }
-          res.json({success: true, temperature: tempdata, humidity: humiditydata, score: scoredata, mintemp: Math.floor(mintemp-1), maxtemp: Math.ceil(maxtemp+1), minhumidity: Math.floor(minhumidity-2), maxhumidity: Math.ceil(maxhumidity+2), minscore: minscore-1, maxscore: Math.min(maxscore+1,10)});
         })
       }, () => {
         res.json({success: false, temperature: null, humidity: null, score: null, mintemp: null, maxtemp: null, minhumidity: null, maxhumidity: null, minscore: null, maxscore: null});

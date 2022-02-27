@@ -57,7 +57,7 @@ plotOptions: {
         label: 'Intensity',
         formatter: function (w) {
           // By default this function returns the average of all series. The below is just an example to show the use of custom formatter function
-          return intensity+" lux";
+          return intensity.toFixed(0)+" lux";
         }
       }
     }
@@ -195,7 +195,7 @@ var scoreChartOptions = {
       fontSize: '17px',
       fontWeight: 'normal',
     },
-    text: 'Histoic Session Scores'
+    text: 'Historic Session Scores'
   },
   grid: {
     row: {
@@ -232,7 +232,7 @@ var scoreChartOptions = {
   },
   tooltip: {
     x: {
-      format: "HH:mm"
+      format: "dd/MM HH:mm"
     },
   }
 };
@@ -263,7 +263,7 @@ title: {
     fontSize: '17px',
     fontWeight: 'normal',
   },
-  text: 'Histoic Session Temperature and Humidity'
+  text: 'Historic Session Temperature and Humidity'
 },
 grid: {
   row: {
@@ -274,13 +274,13 @@ grid: {
 xaxis: {
   type:'datetime',
   title: {
-    text: "Time",
+    text: "Date / Time",
     style: {
       fontWeight: 'normal'
     }
   },
   labels: {
-    format: "HH:mm"
+    format: "dd/MM HH:mm"
   }
 },
 yaxis: [{
@@ -326,7 +326,7 @@ yaxis: [{
 tooltip: {
   shared: true,
   x: {
-    format: "HH:mm"
+    format: "dd/MM HH:mm"
   },
   y: [{
     formatter: function(val) {
@@ -347,8 +347,8 @@ function LatestData() {
     .then(response => response.json())
     .then((data) => {
       if(data.success){
-        document.getElementById("temp").innerHTML = "Current temperature: "+data.temperature+"<span>&#176;</span>c";
-        document.getElementById("humidity").innerText = "Current humidity: " + data.humidity+"%";
+        document.getElementById("temp").innerHTML = "Current temperature: "+data.temperature.toFixed(2)+"<span>&#176;</span>c";
+        document.getElementById("humidity").innerText = "Current humidity: " + data.humidity.toFixed(2)+"%";
         intensity = data.intensity;
         colourData = data.colours;
         if(ccRendered) {
@@ -409,8 +409,8 @@ function HistoricSessions() {
         maxTempSession = data.maxtemp;
         minScore = data.minscore;
         maxScore = data.maxscore
-        humidityData = data.humidity;
-        tempData = data.temperature;
+        humidityDataSession = data.humidity;
+        tempDataSession = data.temperature;
         scoreData = data.score;
         if(thscRendered){
           tempHumidSessionChart.updateSeries([{
@@ -433,11 +433,17 @@ function HistoricSessions() {
           thscRendered = true;
         }
         if(scRendered){
-          scoreChart.updateSeries(scoreData,true);
+          scoreChart.updateSeries([{
+            name: "Score",
+            data: scoreData
+          }],true);
         } else {
           scoreChart = new ApexCharts(document.querySelector("#scoreChart"), scoreChartOptions);
           scoreChart.render();
-          scoreChart.updateSeries(scoreData,true);
+          scoreChart.updateSeries([{
+            name: "Score",
+            data: scoreData
+          }],true);
           scRendered = true;
         }
       }
@@ -450,5 +456,5 @@ document.addEventListener("DOMContentLoaded", function () {
   HistoricSessions();
 });
 
-setInterval(LatestData, 60000);
+setInterval(LatestData, 20000);
 setInterval(TempHumidityGraph, 60000);
